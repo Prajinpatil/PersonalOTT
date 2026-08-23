@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    background-color: #09090b;
+    color: #f4f4f5;
+  }
+}
+
+/* Custom scrollbar for horizontal video carousels */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(24, 24, 27, 0.5);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(82, 82, 91, 0.7);
+  border-radius: 9999px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(220, 38, 38, 0.8);
+}
