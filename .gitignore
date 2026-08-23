@@ -14,6 +14,11 @@ dist/
 build/
 out/
 
+# PDF Walkthrough & generated documents
+walkthrough.pdf
+*.pdf
+generate_pdf.py
+
 # OS & Editor generated files
 .DS_Store
 .DS_Store?
