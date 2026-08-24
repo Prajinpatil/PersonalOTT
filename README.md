@@ -44,14 +44,14 @@ The platform demonstrates modern cloud-native system design: decoupling metadata
 - Cloudflare R2 responds with `HTTP 206 Partial Content`, sending only the exact requested bytes for that timestamp.
 - This provides instant seeking and scrubbing without requiring custom HLS/DASH transcoders.
 
-### 4. Storage Budget Optimization & FFmpeg Compression Strategy
-- **480p / 720p Clips Over Full Movies**: To maximize demo impact, the platform uses 2-10 minute open-licensed clips (50-150MB each) rather than 15 full-length movies. This populates a **30-50+ title catalog** within Cloudflare R2's 10GB free tier.
-- **FFmpeg Pre-Upload Compression**:
+### 4. Storage Budget Optimization & Bulk R2 Uploader
+- **480p / 720p Clips Over Full Movies**: To maximize demo impact, the platform uses 2-10 minute open-licensed clips (50-150MB each) across Horror, Sci-Fi, Comedy, and Thriller rather than 15 full-length movies. This populates a **32-title catalog** within Cloudflare R2's 10GB free tier.
+- **Automated Cloudflare R2 Bulk Upload Command**:
   ```bash
-  ffmpeg -i input.mp4 -vcodec libx264 -crf 28 output.mp4
+  cd backend
+  npm run upload-r2
   ```
-  Running uploads through H.264 CRF 28 reduces file size significantly with zero noticeable loss in visual quality, stretching free tier storage capacity 3-4x.
-- **Generous Operations Limit**: R2 includes 1M Class A (writes) and 10M Class B (reads) operations per month—far beyond what any recruiter demo or portfolio traffic generates.
+  *When Cloudflare R2 credentials are set in `backend/.env`, this script automatically downloads compressed 480p/720p MP4 clips for Horror, Sci-Fi, Comedy, and Thriller, uploads them directly to your Cloudflare R2 bucket (`videos/horror/*.mp4`), and updates the database records.*
 
 ### 5. Known Constraints & Production Scaling Strategy (Gigabyte-Month Billing)
 > **💡 Key System Design Interview Discussion Point:**
@@ -72,33 +72,6 @@ The platform demonstrates modern cloud-native system design: decoupling metadata
 - **Database**: MongoDB Atlas (Mongoose ODM).
 - **Object Storage**: Cloudflare R2 (S3-compatible API).
 - **Deployment**: Frontend → Vercel | Backend → Render Web Service | Database → MongoDB Atlas | Storage → Cloudflare R2.
-
----
-
-## 📁 Monorepo Directory Structure
-
-```
-E:\web dev\OTT
-├── .gitignore
-├── README.md
-├── frontend/             # React (Vite) Single Page Application
-│   ├── package.json
-│   ├── vite.config.js
-│   ├── index.html
-│   └── src/
-│       ├── api/          # Axios HTTP client with JWT interceptor
-│       ├── components/   # VideoPlayer, Navbar, VideoCard, VideoRow, HeroBanner
-│       ├── context/      # AuthContext
-│       └── pages/        # HomePage, WatchPage, SearchPage, AdminDashboard, Auth pages
-└── backend/              # Express API Server
-    ├── package.json
-    ├── .env
-    ├── index.js          # Express entrypoint
-    ├── config/           # db.js (MongoDB) & r2.js (Cloudflare R2 SDK)
-    ├── models/           # User, Video, WatchProgress
-    ├── routes/           # Auth, Video, Progress routes
-    └── scripts/          # Database seeder with 32 titles (npm run seed)
-```
 
 ---
 
@@ -162,11 +135,14 @@ npm install
 cd ../backend
 npm run seed
 ```
-> **Default Test Accounts Created:**
-> - **Admin**: `admin@ott.com` / `admin123`
-> - **User**: `user@ott.com` / `user123`
 
-### 3. Run Development Servers
+### 3. Bulk Upload Compressed Clips to Cloudflare R2 (Optional)
+```bash
+# Set your Cloudflare R2 keys in backend/.env, then run:
+npm run upload-r2
+```
+
+### 4. Run Development Servers
 ```bash
 # Terminal 1: Run Express Server (http://localhost:5000)
 cd backend
@@ -176,31 +152,3 @@ npm run dev
 cd frontend
 npm run dev
 ```
-
----
-
-## 🌐 Cloud Deployment Guide
-
-### 1. Database (MongoDB Atlas)
-- Create a free **M0 Cluster** on MongoDB Atlas.
-- Add Network Access IP `0.0.0.0/0` (or Render outbound IPs).
-- Copy the MongoDB connection string to `MONGODB_URI`.
-
-### 2. Object Storage (Cloudflare R2)
-- Navigate to Cloudflare Dashboard → R2 → Create Bucket `personal-ott-bucket`.
-- Generate API Token with **Object Read & Write** permissions.
-- Note `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, and `R2_BUCKET_NAME`.
-
-### 3. Backend (Render)
-- Connect repository to Render as a **Web Service**.
-- Build Command: `cd backend && npm install`
-- Start Command: `cd backend && npm start`
-- Set Environment Variables in Render Dashboard.
-
-### 4. Frontend (Vercel)
-- Connect repository to Vercel.
-- Framework Preset: **Vite**.
-- Root Directory: `frontend`.
-- Build Command: `npm run build`
-- Output Directory: `dist`
-- Set Environment Variable: `VITE_API_URL=https://<your-render-app>.onrender.com/api`.
