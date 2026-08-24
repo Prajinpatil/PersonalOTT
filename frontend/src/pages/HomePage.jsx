@@ -13,12 +13,15 @@ export const HomePage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Preferred Genre Display Order
+  const PRIMARY_GENRES = ['Horror', 'Sci-Fi', 'Comedy', 'Thriller'];
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
       try {
-        const videosRes = await api.get('/videos');
+        const videosRes = await api.get('/videos?limit=50');
         setVideos(videosRes.data.videos || []);
 
         if (user) {
@@ -57,9 +60,6 @@ export const HomePage = () => {
   // Featured Hero Video (first video or fallback)
   const heroVideo = videos.length > 0 ? videos[0] : null;
 
-  // Group videos by unique genres
-  const genres = Array.from(new Set(videos.flatMap((v) => v.genre || [])));
-
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-20">
       {/* Featured Hero Banner */}
@@ -76,8 +76,9 @@ export const HomePage = () => {
         {loading ? (
           <>
             <RowSkeleton title="Continue Watching" />
-            <RowSkeleton title="Trending Sci-Fi" />
-            <RowSkeleton title="Action Blockbusters" />
+            <RowSkeleton title="Horror Cinema" />
+            <RowSkeleton title="Sci-Fi Thrillers" />
+            <RowSkeleton title="Comedy Blockbusters" />
           </>
         ) : error ? (
           <div className="p-8 my-12 bg-zinc-900 border border-red-900/40 rounded-2xl text-center max-w-lg mx-auto">
@@ -102,22 +103,22 @@ export const HomePage = () => {
               />
             )}
 
-            {/* All Videos / Main Catalog */}
+            {/* Main Catalog / Top Trending */}
             <VideoRow
-              title="Top Trending Movies"
+              title="Top Trending Releases"
               videos={videos}
               progressMap={progressMap}
             />
 
-            {/* Genre-Specific Rows */}
-            {genres.map((genre) => {
+            {/* 4 Primary Platform Genre Rows */}
+            {PRIMARY_GENRES.map((genre) => {
               const genreVideos = videos.filter((v) => v.genre?.includes(genre));
               if (genreVideos.length === 0) return null;
 
               return (
                 <VideoRow
                   key={genre}
-                  title={`${genre} Cinema`}
+                  title={`${genre} Spotlight`}
                   videos={genreVideos}
                   progressMap={progressMap}
                 />

@@ -2,7 +2,7 @@
 
 PersonalOTT is a resume-grade, production-structured video streaming platform built with **React (Vite)**, **Node.js / Express**, **MongoDB Atlas**, and **Cloudflare R2** object storage.
 
-The platform demonstrates modern cloud-native system design: decoupling metadata from binary video storage, offloading heavy file transfers directly to Cloudflare R2 via short-lived pre-signed URLs, and enabling real byte-range streaming (`HTTP 206 Partial Content`) for instant video seeking.
+The platform demonstrates modern cloud-native system design: decoupling metadata from binary video storage, offloading heavy file transfers directly to Cloudflare R2 via short-lived pre-signed URLs, and enabling real byte-range streaming (`HTTP 206 Partial Content`) for instant video seeking across **Horror**, **Sci-Fi**, **Comedy**, and **Thriller** catalog titles.
 
 ---
 
@@ -44,10 +44,24 @@ The platform demonstrates modern cloud-native system design: decoupling metadata
 - Cloudflare R2 responds with `HTTP 206 Partial Content`, sending only the exact requested bytes for that timestamp.
 - This provides instant seeking and scrubbing without requiring custom HLS/DASH transcoders.
 
-### 4. How is Watch Progress tracked?
-- The `<video>` component throttles `timeupdate` events to `POST /api/progress/:videoId` every 5 seconds.
-- Upserts a compound-indexed `{ userId, videoId }` document in MongoDB Atlas.
-- When opening a video, the player queries `/api/progress/:videoId` and automatically seeks to the saved timestamp.
+### 4. Storage Budget Optimization & FFmpeg Compression Strategy
+- **480p / 720p Clips Over Full Movies**: To maximize demo impact, the platform uses 2-10 minute open-licensed clips (50-150MB each) rather than 15 full-length movies. This populates a **30-50+ title catalog** within Cloudflare R2's 10GB free tier.
+- **FFmpeg Pre-Upload Compression**:
+  ```bash
+  ffmpeg -i input.mp4 -vcodec libx264 -crf 28 output.mp4
+  ```
+  Running uploads through H.264 CRF 28 reduces file size significantly with zero noticeable loss in visual quality, stretching free tier storage capacity 3-4x.
+- **Generous Operations Limit**: R2 includes 1M Class A (writes) and 10M Class B (reads) operations per month—far beyond what any recruiter demo or portfolio traffic generates.
+
+### 5. Known Constraints & Production Scaling Strategy (Gigabyte-Month Billing)
+> **💡 Key System Design Interview Discussion Point:**
+>
+> Cloud storage billing is calculated on a **Gigabyte-Month** basis (averaging peak daily storage over a 30-day billing cycle). If PersonalOTT scaled to real-world user uploads of 4K feature films, the 10GB free tier would be exhausted almost instantly.
+>
+> **Production Scaling Mitigation Plan:**
+> 1. **Automated Lifecycle Expiration Policies**: Configure S3/R2 lifecycle rules to transition cold/unwatched video objects (>30 days) to cheaper archival storage (e.g. AWS Glacier / Deep Archive) or purge expired temp uploads.
+> 2. **Multi-Bitrate Transcoding Pipeline**: Integrate AWS Elemental MediaConvert or FFmpeg microservices to generate HLS (`.m3u8`) variants automatically on upload.
+> 3. **Storage Quotas & Tiered Subscriptions**: Enforce per-creator storage limits and implement paid subscription tiers to fund object storage scaling.
 
 ---
 
@@ -83,7 +97,7 @@ E:\web dev\OTT
     ├── config/           # db.js (MongoDB) & r2.js (Cloudflare R2 SDK)
     ├── models/           # User, Video, WatchProgress
     ├── routes/           # Auth, Video, Progress routes
-    └── scripts/          # Database seeder (npm run seed)
+    └── scripts/          # Database seeder with 32 titles (npm run seed)
 ```
 
 ---
@@ -143,7 +157,7 @@ cd ../frontend
 npm install
 ```
 
-### 2. Seed Initial Demo Catalog & Users
+### 2. Seed Initial 32-Title Catalog (Horror, Sci-Fi, Comedy, Thriller)
 ```bash
 cd ../backend
 npm run seed

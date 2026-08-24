@@ -16,7 +16,8 @@ export const SearchPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const GENRES = ['All', 'Sci-Fi', 'Action', 'Animation', 'Comedy', 'Documentary', 'Drama', 'Fantasy'];
+  // 4 Primary Platform Genres
+  const GENRES = ['All', 'Horror', 'Sci-Fi', 'Comedy', 'Thriller'];
 
   useEffect(() => {
     const fetchVideos = async () => {
@@ -88,9 +89,9 @@ export const SearchPage = () => {
               <button
                 key={g}
                 onClick={() => handleGenreClick(g)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${
+                className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap border ${
                   selectedGenre === g
-                    ? 'bg-red-600 border-red-500 text-white shadow-lg shadow-red-600/30'
+                    ? 'bg-red-600 border-red-500 text-white shadow-lg shadow-red-600/30 scale-105'
                     : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
                 }`}
               >
@@ -127,7 +128,7 @@ export const SearchPage = () => {
             <Sparkles className="w-12 h-12 text-zinc-600 mx-auto" />
             <h3 className="text-lg font-bold text-white">No Matching Titles Found</h3>
             <p className="text-zinc-400 text-sm px-4">
-              Try adjusting your query terms or selecting another genre category.
+              Try adjusting your query terms or selecting another genre category (Horror, Sci-Fi, Comedy, Thriller).
             </p>
           </div>
         ) : (
