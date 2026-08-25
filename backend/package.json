@@ -8,11 +8,13 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "seed": "node scripts/seed.js",
-    "upload-r2": "node scripts/upload_to_r2.js"
+    "upload-r2": "node scripts/upload_to_r2.js",
+    "seed-and-upload": "node scripts/seed_and_upload.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.758.0",
     "@aws-sdk/s3-request-presigner": "^3.758.0",
+    "axios": "^1.8.1",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",

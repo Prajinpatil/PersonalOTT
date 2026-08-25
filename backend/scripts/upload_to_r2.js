@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import https from 'https';
@@ -7,6 +7,9 @@ import { connectDB } from '../config/db.js';
 import { Video } from '../models/Video.js';
 
 dotenv.config();
+
+// Safety Threshold: Cap total bucket size at 7.0 GB (7,516,192,768 bytes) to stay safely within the 10GB free tier
+const MAX_TOTAL_BYTES = 7 * 1024 * 1024 * 1024;
 
 const isR2Configured = () => {
   return (
@@ -23,13 +26,16 @@ const isR2Configured = () => {
   );
 };
 
-// Download helper into Buffer
+// Download helper into Buffer with redirect support
 const fetchBuffer = (url) => {
   return new Promise((resolve, reject) => {
     const client = url.startsWith('https') ? https : http;
     client.get(url, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         return fetchBuffer(res.headers.location).then(resolve).catch(reject);
+      }
+      if (res.statusCode !== 200) {
+        return reject(new Error(`HTTP status ${res.statusCode} loading ${url}`));
       }
       const chunks = [];
       res.on('data', (chunk) => chunks.push(chunk));
@@ -45,15 +51,8 @@ const processAndUploadClips = async () => {
     console.log('[R2 Uploader] Database connected.');
 
     if (!isR2Configured()) {
-      console.log('===========================================================');
-      console.log('  Cloudflare R2 Credentials Not Yet Set in backend/.env');
-      console.log('  To perform actual uploads to your Cloudflare R2 bucket:');
-      console.log('  1. Open backend/.env');
-      console.log('  2. Set your R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY');
-      console.log('  3. Run: npm run upload-r2');
-      console.log('  Currently using compressed open 480p/720p direct stream fallbacks.');
-      console.log('===========================================================');
-      process.exit(0);
+      console.error('[R2 Error] Cloudflare R2 Credentials missing or incomplete in backend/.env');
+      process.exit(1);
     }
 
     const s3Client = new S3Client({
@@ -65,26 +64,52 @@ const processAndUploadClips = async () => {
       },
     });
 
+    // 1. Calculate current bucket storage usage
+    let currentBucketBytes = 0;
+    try {
+      const listRes = await s3Client.send(new ListObjectsV2Command({ Bucket: process.env.R2_BUCKET_NAME }));
+      if (listRes.Contents) {
+        currentBucketBytes = listRes.Contents.reduce((sum, item) => sum + (item.Size || 0), 0);
+      }
+      console.log(`[R2 Storage Audit] Current Bucket Usage: ${(currentBucketBytes / (1024 * 1024)).toFixed(2)} MB / Safety Limit: 7168 MB (7.0 GB)`);
+    } catch (auditErr) {
+      console.warn('[R2 Storage Audit Warning] Could not list existing objects:', auditErr.message);
+    }
+
     const videos = await Video.find({});
-    console.log(`[R2 Uploader] Found ${videos.length} titles to process...`);
+    console.log(`[R2 Uploader] Found ${videos.length} titles across Horror, Sci-Fi, Comedy, Thriller...`);
 
     let uploadedCount = 0;
+    let bytesUploadedThisRun = 0;
 
     for (const video of videos) {
+      // Check 7.0 GB Safety Limit
+      if (currentBucketBytes + bytesUploadedThisRun >= MAX_TOTAL_BYTES) {
+        console.warn(`[SAFETY TRIGGERED] Reached 7.0 GB safety threshold! Halting further uploads to protect free tier limit.`);
+        break;
+      }
+
       const genreFolder = (video.genre && video.genre[0]) ? video.genre[0].toLowerCase() : 'general';
       const cleanTitle = video.title.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
       const r2ObjectKey = `videos/${genreFolder}/${cleanTitle}.mp4`;
 
-      console.log(`[Processing] ${video.title} -> Key: ${r2ObjectKey}`);
-
-      // If videoKey is a URL, fetch clip buffer and upload to R2
+      // If videoKey is still an external URL, upload to R2
       if (video.videoKey.startsWith('http')) {
         try {
-          console.log(`  Downloading compressed clip from: ${video.videoKey.substring(0, 60)}...`);
-          const buffer = await fetchBuffer(video.videoKey);
+          console.log(`\n[Processing ${uploadedCount + 1}/${videos.length}] ${video.title} (${genreFolder.toUpperCase()})`);
+          console.log(`  Downloading compressed 480p/720p clip...`);
 
-          console.log(`  Uploading ${(buffer.length / (1024 * 1024)).toFixed(2)} MB directly to R2 bucket "${process.env.R2_BUCKET_NAME}"...`);
-          
+          const buffer = await fetchBuffer(video.videoKey);
+          const fileSizeMB = buffer.length / (1024 * 1024);
+
+          // Check if adding this file exceeds 7.0 GB limit
+          if (currentBucketBytes + bytesUploadedThisRun + buffer.length > MAX_TOTAL_BYTES) {
+            console.warn(`  [Safety Cap] Uploading ${fileSizeMB.toFixed(2)} MB would breach 7.0 GB limit. Skipping ${video.title}.`);
+            continue;
+          }
+
+          console.log(`  Uploading ${fileSizeMB.toFixed(2)} MB directly to Cloudflare R2 bucket "${process.env.R2_BUCKET_NAME}"...`);
+
           await s3Client.send(
             new PutObjectCommand({
               Bucket: process.env.R2_BUCKET_NAME,
@@ -94,22 +119,30 @@ const processAndUploadClips = async () => {
             })
           );
 
-          // Update MongoDB videoKey to R2 object key
+          bytesUploadedThisRun += buffer.length;
           video.videoKey = r2ObjectKey;
           await video.save();
           uploadedCount++;
-          console.log(`  ✓ Successfully uploaded and updated database record!`);
+
+          const totalUsedMB = ((currentBucketBytes + bytesUploadedThisRun) / (1024 * 1024)).toFixed(2);
+          console.log(`  ✓ Uploaded successfully! Key: ${r2ObjectKey}`);
+          console.log(`  📊 Total R2 Storage Used: ${totalUsedMB} MB / 7168 MB Cap`);
         } catch (err) {
-          console.error(`  ✕ Error uploading clip for ${video.title}:`, err.message);
+          console.error(`  ✕ Failed to process ${video.title}:`, err.message);
         }
       } else {
-        console.log(`  ✓ Already stored as R2 key: ${video.videoKey}`);
+        console.log(`  ✓ Title "${video.title}" already points to R2 key: ${video.videoKey}`);
       }
     }
 
-    console.log('===========================================================');
-    console.log(`  Cloudflare R2 Bulk Upload Complete! Uploaded ${uploadedCount} clips.`);
-    console.log('  All video keys updated to Cloudflare R2 object paths.');
+    const finalTotalMB = ((currentBucketBytes + bytesUploadedThisRun) / (1024 * 1024)).toFixed(2);
+    const finalTotalGB = ((currentBucketBytes + bytesUploadedThisRun) / (1024 * 1024 * 1024)).toFixed(2);
+
+    console.log('\n===========================================================');
+    console.log(`  Cloudflare R2 Bulk Upload Complete!`);
+    console.log(`  Titles Uploaded This Run: ${uploadedCount}`);
+    console.log(`  Final R2 Storage Usage: ${finalTotalMB} MB (${finalTotalGB} GB)`);
+    console.log(`  Safety Limit: 7.0 GB (Well within 10 GB Free Tier)`);
     console.log('===========================================================');
     process.exit(0);
   } catch (error) {
