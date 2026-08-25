@@ -1,8 +1,8 @@
 # PersonalOTT — Full-Stack Video Streaming Platform
 
-PersonalOTT is a resume-grade, production-structured video streaming platform built with **React (Vite)**, **Node.js / Express**, **MongoDB Atlas**, and **Cloudflare R2** object storage.
+PersonalOTT is a production-engineered, full-stack video streaming platform built with **React (Vite)**, **Node.js / Express**, **MongoDB Atlas**, and **Cloudflare R2** object storage.
 
-The platform demonstrates modern cloud-native system design: decoupling metadata from binary video storage, offloading heavy file transfers directly to Cloudflare R2 via short-lived pre-signed URLs, and enabling real byte-range streaming (`HTTP 206 Partial Content`) for instant video seeking across **Horror**, **Sci-Fi**, **Comedy**, and **Thriller** catalog titles.
+The platform replicates modern streaming infrastructure (such as Netflix and Prime Video) by decoupling metadata persistence from binary video delivery, leveraging short-lived pre-signed URLs for direct client uploads, and serving byte-range streams (`HTTP 206 Partial Content`) for instant video playback and seeking.
 
 ---
 
@@ -26,74 +26,80 @@ The platform demonstrates modern cloud-native system design: decoupling metadata
 
 ---
 
-## 🎯 Key Design Decisions & Interview Q&A
+## ✨ Key Features
 
-### 1. Why store video in Cloudflare R2 instead of MongoDB?
-- **Database Bloat Prevention**: Binary data in BSON documents degrades database performance, index size, and backup speed. MongoDB Atlas M0 free tier has a 512MB limit.
-- **Cost & Egress**: Cloudflare R2 is S3-compatible, offers **10 GB free storage**, and has **zero egress fees**, making it ideal for video content delivery.
-
-### 2. How do client direct pre-signed PUT uploads work?
-- When an admin uploads a video file, the client first requests a pre-signed `PUT` URL from `/api/videos/upload-url`.
-- Express signs the request using `@aws-sdk/s3-request-presigner` and returns a 15-minute temporary URL.
-- The browser uploads the raw video file **directly to Cloudflare R2** using Axios/fetch `PUT`.
-- **Interview Takeaway**: Express server memory and network bandwidth are never choked by large video transfers.
-
-### 3. How does video streaming & seeking work without downloading the entire file?
-- The backend generates a 1-hour pre-signed `GET` URL for the video's R2 object key (`GET /api/videos/:id/stream-url`).
-- The HTML5 `<video>` tag issues `HTTP Range: bytes=X-Y` headers directly to R2.
-- Cloudflare R2 responds with `HTTP 206 Partial Content`, sending only the exact requested bytes for that timestamp.
-- This provides instant seeking and scrubbing without requiring custom HLS/DASH transcoders.
-
-### 4. Storage Budget Optimization & Bulk R2 Uploader
-- **480p / 720p Clips Over Full Movies**: To maximize demo impact, the platform uses 2-10 minute open-licensed clips (50-150MB each) across Horror, Sci-Fi, Comedy, and Thriller rather than 15 full-length movies. This populates a **32-title catalog** within Cloudflare R2's 10GB free tier.
-- **Automated Cloudflare R2 Bulk Upload Command**:
-  ```bash
-  cd backend
-  npm run upload-r2
-  ```
-  *When Cloudflare R2 credentials are set in `backend/.env`, this script automatically downloads compressed 480p/720p MP4 clips for Horror, Sci-Fi, Comedy, and Thriller, uploads them directly to your Cloudflare R2 bucket (`videos/horror/*.mp4`), and updates the database records.*
-
-### 5. Known Constraints & Production Scaling Strategy (Gigabyte-Month Billing)
-> **💡 Key System Design Interview Discussion Point:**
->
-> Cloud storage billing is calculated on a **Gigabyte-Month** basis (averaging peak daily storage over a 30-day billing cycle). If PersonalOTT scaled to real-world user uploads of 4K feature films, the 10GB free tier would be exhausted almost instantly.
->
-> **Production Scaling Mitigation Plan:**
-> 1. **Automated Lifecycle Expiration Policies**: Configure S3/R2 lifecycle rules to transition cold/unwatched video objects (>30 days) to cheaper archival storage (e.g. AWS Glacier / Deep Archive) or purge expired temp uploads.
-> 2. **Multi-Bitrate Transcoding Pipeline**: Integrate AWS Elemental MediaConvert or FFmpeg microservices to generate HLS (`.m3u8`) variants automatically on upload.
-> 3. **Storage Quotas & Tiered Subscriptions**: Enforce per-creator storage limits and implement paid subscription tiers to fund object storage scaling.
+- **Decoupled Architecture**: High-speed MongoDB metadata querying coupled with S3-compatible Cloudflare R2 binary storage.
+- **Direct Pre-Signed R2 Uploads**: Clients request temporary pre-signed `PUT` URLs to upload video files directly to Cloudflare R2, bypassing server bandwidth bottlenecks.
+- **Byte-Range HTTP 206 Streaming**: HTML5 video playback with native `Range: bytes=X-Y` header support for instant scrubbing without downloading full files.
+- **Watch Progress Auto-Resume**: Automatic throttled sync to `/api/progress/:videoId` with compound-indexed database persistence (`{ userId, videoId }`).
+- **Curated Multi-Genre Catalog**: 32 titles organized under **Horror**, **Sci-Fi**, **Comedy**, and **Thriller**.
+- **Admin Management Studio**: Integrated dashboard for uploading new titles, tracking pre-signed upload progress, and catalog management.
+- **Responsive Dark OTT UX**: Built with Tailwind CSS, custom horizontal scroll carousels, and loading skeletons.
 
 ---
 
-## 🛠️ Tech Stack
+## 💻 Tech Stack
 
-- **Frontend**: React 19 (Vite), React Router v7, Axios, Tailwind CSS v4, Lucide Icons.
-- **Backend**: Node.js, Express.js, JWT Authentication (`jsonwebtoken` + `bcryptjs`), `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`.
-- **Database**: MongoDB Atlas (Mongoose ODM).
-- **Object Storage**: Cloudflare R2 (S3-compatible API).
-- **Deployment**: Frontend → Vercel | Backend → Render Web Service | Database → MongoDB Atlas | Storage → Cloudflare R2.
+| Component | Technology | Description |
+| :--- | :--- | :--- |
+| **Frontend Framework** | React 19 (Vite) | Single Page Application with fast HMR |
+| **Styling & UI** | Tailwind CSS v4 + Lucide Icons | Responsive dark OTT theme |
+| **Routing & Client** | React Router v7 + Axios | Declarative client routing and HTTP interceptors |
+| **Backend API** | Node.js + Express.js | RESTful API server |
+| **Authentication** | JWT + BcryptJS | Password hashing and session tokens |
+| **Database** | MongoDB Atlas (Mongoose) | Metadata & progress persistence |
+| **Object Storage** | Cloudflare R2 | S3-compatible object storage (Zero egress fees) |
+| **SDK & Signer** | `@aws-sdk/client-s3` | S3 v4 pre-signed URL generation |
 
 ---
 
-## 📡 API Endpoints
+## 📁 Directory Structure
+
+```
+E:\web dev\OTT
+├── .gitignore
+├── README.md             # Resume & Placement Documentation
+├── walkthrough.pdf       # Complete System Design & Interview Q&A Guide (Ignored by Git)
+├── frontend/             # React (Vite) Frontend Application
+│   ├── package.json
+│   ├── vite.config.js
+│   ├── index.html
+│   └── src/
+│       ├── api/          # Axios client with JWT authorization interceptors
+│       ├── components/   # VideoPlayer, Navbar, VideoCard, VideoRow, HeroBanner
+│       ├── context/      # AuthContext
+│       └── pages/        # HomePage, WatchPage, SearchPage, AdminDashboard, Auth pages
+└── backend/              # Express API Server
+    ├── package.json
+    ├── .env
+    ├── index.js          # Express entrypoint & auto-seeder
+    ├── config/           # db.js (MongoDB) & r2.js (Cloudflare R2 SDK)
+    ├── models/           # User, Video, WatchProgress
+    ├── routes/           # Auth, Video, Progress routes
+    └── scripts/          # Database seeder & Cloudflare R2 uploader
+```
+
+---
+
+## 📡 API Endpoints Summary
 
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/auth/register` | Public | Register new user (returns JWT token) |
-| `POST` | `/api/auth/login` | Public | Authenticate user (returns JWT token) |
+| `POST` | `/api/auth/register` | Public | Register new user (returns JWT) |
+| `POST` | `/api/auth/login` | Public | Authenticate user (returns JWT) |
 | `GET` | `/api/auth/me` | Protected | Fetch current user session profile |
 | `GET` | `/api/videos` | Public | Get paginated video catalog (`?genre=`, `?search=`) |
 | `GET` | `/api/videos/:id` | Public | Get single video metadata details |
-| `POST` | `/api/videos/upload-url` | Admin | Generate pre-signed R2 `PUT` URL for file upload |
+| `POST` | `/api/videos/upload-url` | Admin | Generate pre-signed R2 `PUT` URL for direct upload |
 | `POST` | `/api/videos` | Admin | Save video metadata record in MongoDB Atlas |
 | `GET` | `/api/videos/:id/stream-url` | Protected | Generate pre-signed R2 `GET` URL for stream |
-| `GET` | `/api/progress` | Protected | Fetch user's watch history & positions |
+| `GET` | `/api/progress` | Protected | Fetch user's watch history & progress positions |
 | `GET` | `/api/progress/:videoId` | Protected | Fetch saved playback position for video |
 | `POST` | `/api/progress/:videoId` | Protected | Save / update current playback position |
 
 ---
 
-## 🔑 Environment Variables
+## 🔑 Environment Variables Setup
 
 ### Backend (`backend/.env`)
 ```env
@@ -104,17 +110,17 @@ R2_ACCOUNT_ID=your_cloudflare_account_id
 R2_ACCESS_KEY_ID=your_r2_access_key_id
 R2_SECRET_ACCESS_KEY=your_r2_secret_access_key
 R2_BUCKET_NAME=personal-ott-bucket
-CLIENT_URL=https://your-app.vercel.app
+CLIENT_URL=http://localhost:5173
 ```
 
 ### Frontend (`frontend/.env`)
 ```env
-VITE_API_URL=https://your-backend.onrender.com/api
+VITE_API_URL=http://localhost:5000/api
 ```
 
 ---
 
-## 🚀 Local Quickstart Guide
+## 🚀 Launch & Setup Instructions
 
 ### 1. Clone & Install Dependencies
 ```bash
@@ -130,19 +136,21 @@ cd ../frontend
 npm install
 ```
 
-### 2. Seed Initial 32-Title Catalog (Horror, Sci-Fi, Comedy, Thriller)
+### 2. Configure Cloudflare R2 Credentials & Seed Database
+1. Create a bucket on Cloudflare R2 (`personal-ott-bucket`).
+2. Generate an R2 API Token with **Object Read & Write** permissions.
+3. Add credentials to `backend/.env`.
+4. Run bulk upload & seed script:
 ```bash
-cd ../backend
-npm run seed
+cd backend
+npm run seed-and-upload
 ```
 
-### 3. Bulk Upload Compressed Clips to Cloudflare R2 (Optional)
-```bash
-# Set your Cloudflare R2 keys in backend/.env, then run:
-npm run upload-r2
-```
+> **Default Test Accounts:**
+> - **Admin**: `admin@ott.com` / `admin123`
+> - **User**: `user@ott.com` / `user123`
 
-### 4. Run Development Servers
+### 3. Launch Development Servers
 ```bash
 # Terminal 1: Run Express Server (http://localhost:5000)
 cd backend
@@ -152,3 +160,9 @@ npm run dev
 cd frontend
 npm run dev
 ```
+
+---
+
+## 📄 System Design & Interview Guide
+
+All architectural deep dives, system design trade-offs, FFmpeg compression strategies, and recruiter interview Q&A points have been compiled into **`walkthrough.pdf`** located in the root directory.
