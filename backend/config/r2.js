@@ -5,10 +5,13 @@ const isR2Configured = () => {
   return (
     process.env.R2_ACCOUNT_ID &&
     process.env.R2_ACCOUNT_ID !== 'demo_account_id' &&
+    process.env.R2_ACCOUNT_ID !== 'your_cloudflare_account_id' &&
     process.env.R2_ACCESS_KEY_ID &&
     process.env.R2_ACCESS_KEY_ID !== 'demo_access_key' &&
+    process.env.R2_ACCESS_KEY_ID !== 'your_r2_access_key_id' &&
     process.env.R2_SECRET_ACCESS_KEY &&
     process.env.R2_SECRET_ACCESS_KEY !== 'demo_secret_key' &&
+    process.env.R2_SECRET_ACCESS_KEY !== 'your_r2_secret_access_key' &&
     process.env.R2_BUCKET_NAME
   );
 };
@@ -31,7 +34,6 @@ if (isR2Configured()) {
  */
 export const generateUploadUrl = async (objectKey, contentType = 'video/mp4') => {
   if (!isR2Configured() || !s3Client) {
-    // Return a mock presigned URL format for demo/testing without cloud setup
     return {
       uploadUrl: `http://localhost:${process.env.PORT || 5000}/api/videos/mock-upload/${objectKey}`,
       objectKey,
@@ -58,21 +60,32 @@ export const generateUploadUrl = async (objectKey, contentType = 'video/mp4') =>
  */
 export const generateStreamUrl = async (objectKey, expiresIn = 3600) => {
   if (!objectKey) return null;
-  
-  // If objectKey is already a full HTTP(S) URL (e.g. sample video link), return directly
-  if (objectKey.startsWith('http://') || objectKey.startsWith('https://')) {
-    return objectKey;
+
+  // Clean object key if legacy Google Cloud URL was stored
+  let cleanKey = objectKey;
+  if (cleanKey.includes('commondatastorage.googleapis.com')) {
+    const filename = cleanKey.split('/').pop();
+    cleanKey = `videos/general/${filename}`;
+  }
+
+  // If objectKey is a working HTTP URL (like W3C open stream), return directly
+  if (cleanKey.startsWith('http://') || cleanKey.startsWith('https://')) {
+    return cleanKey;
   }
 
   if (!isR2Configured() || !s3Client) {
-    // Return direct demo video URL fallback
-    return `https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4`;
+    return 'https://media.w3.org/2010/05/sintel/trailer.mp4';
   }
 
-  const command = new GetObjectCommand({
-    Bucket: process.env.R2_BUCKET_NAME,
-    Key: objectKey,
-  });
+  try {
+    const command = new GetObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: cleanKey,
+    });
 
-  return await getSignedUrl(s3Client, command, { expiresIn }); // 1 hour
+    return await getSignedUrl(s3Client, command, { expiresIn }); // 1 hour expiration
+  } catch (error) {
+    console.error(`[R2 Stream Sign Error] Failed to generate signed GET URL for key ${cleanKey}:`, error.message);
+    return 'https://media.w3.org/2010/05/sintel/trailer.mp4';
+  }
 };

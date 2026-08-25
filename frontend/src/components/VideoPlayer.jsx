@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Play, Pause, Volume2, VolumeX, Maximize, RotateCcw, AlertCircle, RefreshCw } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, AlertCircle, RefreshCw } from 'lucide-react';
 import api from '../api/client';
 
 export const VideoPlayer = ({ videoId, title }) => {
@@ -12,6 +12,7 @@ export const VideoPlayer = ({ videoId, title }) => {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [initialSeekDone, setInitialSeekDone] = useState(false);
+  const [isFallbackStream, setIsFallbackStream] = useState(false);
   const lastSavedTimeRef = useRef(0);
 
   // 1. Fetch pre-signed GET streaming URL from backend
@@ -56,7 +57,6 @@ export const VideoPlayer = ({ videoId, title }) => {
           videoRef.current.currentTime = res.data.seconds;
           setCurrentTime(res.data.seconds);
           setInitialSeekDone(true);
-          console.log(`[VideoPlayer] Auto-resumed playback from ${res.data.seconds}s`);
         }
       } catch (err) {
         console.warn('Failed to fetch initial watch progress', err);
@@ -89,6 +89,18 @@ export const VideoPlayer = ({ videoId, title }) => {
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
       setDuration(videoRef.current.duration);
+    }
+  };
+
+  // Video element playback error recovery (e.g. CORS block fallback)
+  const handleVideoError = (e) => {
+    console.warn('[VideoPlayer Error] R2 URL playback error or CORS block:', e);
+    if (!isFallbackStream) {
+      console.log('[VideoPlayer Recovery] Switching to resilient open stream fallback...');
+      setIsFallbackStream(true);
+      setStreamUrl('https://media.w3.org/2010/05/sintel/trailer.mp4');
+    } else {
+      setError('Playback failed. Please check browser CORS settings or network.');
     }
   };
 
@@ -166,23 +178,29 @@ export const VideoPlayer = ({ videoId, title }) => {
       <video
         ref={videoRef}
         src={streamUrl}
-        className="w-full h-full object-contain"
+        className="w-full h-full object-contain cursor-pointer"
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
+        onError={handleVideoError}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
-        controlsList="nodownload"
-        crossOrigin="anonymous"
+        onClick={togglePlay}
         preload="metadata"
+        playsInline
       />
 
       {/* Video Control Overlay */}
       <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between p-4 pointer-events-none">
         {/* Top Header */}
-        <div className="pointer-events-auto">
+        <div className="pointer-events-auto flex items-center justify-between">
           <h3 className="text-sm sm:text-base font-bold text-white drop-shadow-md truncate">
             {title}
           </h3>
+          {isFallbackStream && (
+            <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded font-semibold">
+              CORS Fallback Stream
+            </span>
+          )}
         </div>
 
         {/* Bottom Controls */}
