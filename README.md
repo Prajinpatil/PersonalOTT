@@ -26,13 +26,13 @@ The platform replicates modern streaming infrastructure (such as Netflix and Pri
 
 ---
 
-## ✨ Key Features
+##  Key Features
 
-- **Decoupled Architecture**: High-speed MongoDB metadata querying coupled with S3-compatible Cloudflare R2 binary storage.
-- **Direct Pre-Signed R2 Uploads**: Clients request temporary pre-signed `PUT` URLs to upload video files directly to Cloudflare R2, bypassing server bandwidth bottlenecks.
-- **Byte-Range HTTP 206 Streaming**: HTML5 video playback with native `Range: bytes=X-Y` header support for instant scrubbing without downloading full files.
-- **Watch Progress Auto-Resume**: Automatic throttled sync to `/api/progress/:videoId` with compound-indexed database persistence (`{ userId, videoId }`).
-- **Curated Multi-Genre Catalog**: 32 titles organized under **Horror**, **Sci-Fi**, **Comedy**, and **Thriller**.
+- **Decoupled Architecture**: The Architecture includes High-speed MongoDB metadata querying coupled with S3-compatible Cloudflare R2 binary storage.
+- **Direct Pre-Signed R2 Uploads**: To upload video files directly to Cloudflare R2, Clients can request temporary pre-signed `PUT` URLs , which bypasses server bandwidth bottlenecks.
+- **Byte-Range HTTP 206 Streaming**: HTML5 video playback with native `Range: bytes=X-Y` header support for instant scrubbing with no need to  download full files.
+- **Watch Progress Auto-Resume**: Automatic throttled sync feature to `/api/progress/:videoId` along with compound-indexed database persistence (`{ userId, videoId }`).
+- **Curated Multi-Genre Catalog**: Currently 32 titles are organized under **Horror**, **Sci-Fi**, **Comedy**, and **Thriller**.
 - **Admin Management Studio**: Integrated dashboard for uploading new titles, tracking pre-signed upload progress, and catalog management.
 - **Responsive Dark OTT UX**: Built with Tailwind CSS, custom horizontal scroll carousels, and loading skeletons.
 
@@ -58,8 +58,8 @@ The platform replicates modern streaming infrastructure (such as Netflix and Pri
 ```
 E:\web dev\OTT
 ├── .gitignore
-├── README.md             # Resume & Placement Documentation
-├── walkthrough.pdf       # Complete System Design & Interview Q&A Guide (Ignored by Git)
+├── README.md             # Documentation
+├── walkthrough.pdf       # walkthrough pdf (git ignored)
 ├── frontend/             # React (Vite) Frontend Application
 │   ├── package.json
 │   ├── vite.config.js
@@ -81,7 +81,7 @@ E:\web dev\OTT
 
 ---
 
-## 📡 API Endpoints Summary
+## API Endpoints Summary
 
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
@@ -99,7 +99,7 @@ E:\web dev\OTT
 
 ---
 
-## 🔑 Environment Variables Setup
+## Environment Variables Setup
 
 ### Backend (`backend/.env`)
 ```env
@@ -120,7 +120,7 @@ VITE_API_URL=http://localhost:5000/api
 
 ---
 
-## 🚀 Launch & Setup Instructions
+## Launch & Setup Instructions
 
 ### 1. Clone & Install Dependencies
 ```bash
@@ -163,6 +163,3 @@ npm run dev
 
 ---
 
-## 📄 System Design & Interview Guide
-
-All architectural deep dives, system design trade-offs, FFmpeg compression strategies, and recruiter interview Q&A points have been compiled into **`walkthrough.pdf`** located in the root directory.
