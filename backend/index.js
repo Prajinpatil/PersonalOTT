@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
+import rateLimit from 'express-rate-limit';
 import { connectDB } from './config/db.js';
 import { User } from './models/User.js';
 import { Video } from './models/Video.js';
@@ -15,6 +16,23 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Rate Limiters to protect single-instance cloud CPU/RAM against DoS & brute-force
+const generalApiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per window
+  message: { error: 'Too many requests from this IP, please try again after 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Limit each IP to 10 login/register requests per window
+  message: { error: 'Too many authentication attempts. Please try again after 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // CORS configuration for Render + Vercel deployment & Local development
 const allowedOrigins = [
@@ -39,6 +57,10 @@ app.use(
 );
 
 app.use(express.json());
+
+// Apply rate limiting middleware
+app.use('/api', generalApiLimiter);
+app.use('/api/auth', authRateLimiter);
 
 // Auto-seed catalog if empty on server boot
 const autoSeedCatalogIfEmpty = async () => {

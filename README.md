@@ -28,11 +28,12 @@ The platform replicates modern streaming infrastructure (such as Netflix and Pri
 
 ##  Key Features
 
-- **Decoupled Architecture**: The Architecture includes High-speed MongoDB metadata querying coupled with S3-compatible Cloudflare R2 binary storage.
-- **Direct Pre-Signed R2 Uploads**: To upload video files directly to Cloudflare R2, Clients can request temporary pre-signed `PUT` URLs , which bypasses server bandwidth bottlenecks.
-- **Byte-Range HTTP 206 Streaming**: HTML5 video playback with native `Range: bytes=X-Y` header support for instant scrubbing with no need to  download full files.
+- **Decoupled Architecture**: High-speed MongoDB metadata querying coupled with S3-compatible Cloudflare R2 binary storage.
+- **Direct Pre-Signed R2 Uploads**: Temporary pre-signed `PUT` URLs bypass server bandwidth bottlenecks for direct client-to-R2 uploads.
+- **Byte-Range HTTP 206 Streaming**: HTML5 video playback with native `Range: bytes=X-Y` header support for instant scrubbing without downloading full files.
+- **API Rate Limiting & Protection**: `express-rate-limit` middleware prevents DoS attacks, IP spamming, and brute-force credential stuffing.
 - **Watch Progress Auto-Resume**: Automatic throttled sync feature to `/api/progress/:videoId` along with compound-indexed database persistence (`{ userId, videoId }`).
-- **Curated Multi-Genre Catalog**: Currently 32 titles are organized under **Horror**, **Sci-Fi**, **Comedy**, and **Thriller**.
+- **Curated Multi-Genre Catalog**: Currently 32 titles organized under **Horror**, **Sci-Fi**, **Comedy**, and **Thriller**.
 - **Admin Management Studio**: Integrated dashboard for uploading new titles, tracking pre-signed upload progress, and catalog management.
 - **Responsive Dark OTT UX**: Built with Tailwind CSS, custom horizontal scroll carousels, and loading skeletons.
 
@@ -47,6 +48,7 @@ The platform replicates modern streaming infrastructure (such as Netflix and Pri
 | **Routing & Client** | React Router v7 + Axios | Declarative client routing and HTTP interceptors |
 | **Backend API** | Node.js + Express.js | RESTful API server |
 | **Authentication** | JWT + BcryptJS | Password hashing and session tokens |
+| **Security & Protection** | `express-rate-limit` | IP-based API rate limiting and DoS mitigation |
 | **Database** | MongoDB Atlas (Mongoose) | Metadata & progress persistence |
 | **Object Storage** | Cloudflare R2 | S3-compatible object storage (Zero egress fees) |
 | **SDK & Signer** | `@aws-sdk/client-s3` | S3 v4 pre-signed URL generation |
@@ -95,11 +97,11 @@ E:\web dev\OTT
 
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/auth/register` | Public | Register new user (returns JWT) |
-| `POST` | `/api/auth/login` | Public | Authenticate user (returns JWT) |
+| `POST` | `/api/auth/register` | Public (Rate-Limited) | Register new user (returns JWT) |
+| `POST` | `/api/auth/login` | Public (Rate-Limited) | Authenticate user (returns JWT) |
 | `GET` | `/api/auth/me` | Protected | Fetch current user session profile |
-| `GET` | `/api/videos` | Public | Get paginated video catalog (`?genre=`, `?search=`) |
-| `GET` | `/api/videos/:id` | Public | Get single video metadata details |
+| `GET` | `/api/videos` | Public (Rate-Limited) | Get paginated video catalog (`?genre=`, `?search=`) |
+| `GET` | `/api/videos/:id` | Public (Rate-Limited) | Get single video metadata details |
 | `POST` | `/api/videos/upload-url` | Admin | Generate pre-signed R2 `PUT` URL for direct upload |
 | `POST` | `/api/videos` | Admin | Save video metadata record in MongoDB Atlas |
 | `GET` | `/api/videos/:id/stream-url` | Protected | Generate pre-signed R2 `GET` URL for stream |
