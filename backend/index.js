@@ -11,6 +11,7 @@ import { WatchProgress } from './models/WatchProgress.js';
 import authRoutes from './routes/auth.routes.js';
 import videoRoutes from './routes/video.routes.js';
 import progressRoutes from './routes/progress.routes.js';
+import recommendationsRouter from './routes/recommendations.routes.js';
 
 dotenv.config();
 
@@ -412,6 +413,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/videos', videoRoutes);
 app.use('/api/progress', progressRoutes);
+app.use('/api/recommendations', recommendationsRouter);
 
 // 404 Handler
 app.use((req, res) => {

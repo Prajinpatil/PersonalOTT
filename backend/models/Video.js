@@ -27,6 +27,10 @@ const videoSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  embedding: {
+    type: [Number],
+    default: null,
+  },
   uploadedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

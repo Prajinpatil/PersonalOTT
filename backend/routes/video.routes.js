@@ -1,4 +1,5 @@
 import express from 'express';
+import axios from 'axios';
 import { Video } from '../models/Video.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { adminMiddleware } from '../middleware/admin.js';
@@ -56,6 +57,19 @@ router.post('/', authMiddleware, adminMiddleware, async (req, res) => {
       durationSeconds: Number(durationSeconds) || 0,
       uploadedBy: req.user._id,
     });
+
+    // Fetch description embedding from recommender microservice defensively
+    const recommenderUrl = process.env.RECOMMENDER_SERVICE_URL || 'http://localhost:8000';
+    try {
+      const textToEmbed = description || title || '';
+      const embedRes = await axios.post(`${recommenderUrl}/embed`, { text: textToEmbed }, { timeout: 4000 });
+      if (embedRes.data && Array.isArray(embedRes.data.embedding)) {
+        video.embedding = embedRes.data.embedding;
+        await video.save();
+      }
+    } catch (embedError) {
+      console.warn('[Recommender Embed Warning] Failed to generate embedding for video:', embedError.message);
+    }
 
     res.status(201).json({ message: 'Video metadata created successfully', video });
   } catch (error) {

@@ -4,11 +4,12 @@ import { useAuth } from '../context/AuthContext';
 import HeroBanner from '../components/HeroBanner';
 import VideoRow from '../components/VideoRow';
 import { RowSkeleton } from '../components/LoadingSkeleton';
-import { Sparkles, Film, Compass } from 'lucide-react';
+import { Compass } from 'lucide-react';
 
 export const HomePage = () => {
   const { user } = useAuth();
   const [videos, setVideos] = useState([]);
+  const [recommendations, setRecommendations] = useState([]);
   const [progressList, setProgressList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -25,12 +26,28 @@ export const HomePage = () => {
         setVideos(videosRes.data.videos || []);
 
         if (user) {
+          // Fetch watch progress
           try {
             const progressRes = await api.get('/progress');
             setProgressList(progressRes.data.progress || []);
           } catch (pErr) {
             console.warn('Could not fetch user watch progress', pErr);
           }
+
+          // Fetch recommendations (catch silently if unavailable or fails)
+          try {
+            const recRes = await api.get('/recommendations');
+            if (recRes.data && Array.isArray(recRes.data.videos) && recRes.data.videos.length > 0) {
+              setRecommendations(recRes.data.videos);
+            } else {
+              setRecommendations([]);
+            }
+          } catch (rErr) {
+            console.warn('[Recommendations Fetch Warning] Silently omitting row:', rErr.message);
+            setRecommendations([]);
+          }
+        } else {
+          setRecommendations([]);
         }
       } catch (err) {
         setError('Failed to load streaming catalog. Please check server connection.');
@@ -75,6 +92,7 @@ export const HomePage = () => {
       <div className="max-w-7xl mx-auto px-2 sm:px-4 space-y-10 mt-6">
         {loading ? (
           <>
+            <RowSkeleton title="Recommended For You" />
             <RowSkeleton title="Continue Watching" />
             <RowSkeleton title="Horror Cinema" />
             <RowSkeleton title="Sci-Fi Thrillers" />
@@ -94,6 +112,15 @@ export const HomePage = () => {
           </div>
         ) : (
           <>
+            {/* Recommended For You Section (Positioned after hero banner and before genre rows) */}
+            {recommendations.length > 0 && (
+              <VideoRow
+                title="Recommended For You"
+                videos={recommendations}
+                progressMap={progressMap}
+              />
+            )}
+
             {/* Continue Watching Section */}
             {user && continueWatchingVideos.length > 0 && (
               <VideoRow

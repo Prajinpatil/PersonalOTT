@@ -45,3 +45,5 @@ pnpm-debug.log*
 # Database local storage & locks
 .mongodb/
 *.sqlite
+#ml model
+.pkl
