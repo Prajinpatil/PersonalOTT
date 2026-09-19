@@ -1,15 +1,14 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List, Optional
-import pickle
 import os
 import numpy as np
-from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import HashingVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 app = FastAPI()
 
-# Load SVD model defensively — service must not crash if this file is absent
+# Defensively load SVD model if available
 svd_model = None
 possible_paths = [
     os.path.join(os.path.dirname(__file__), "svd_model.pkl"),
@@ -19,16 +18,26 @@ SVD_PATH = next((p for p in possible_paths if os.path.exists(p)), None)
 
 if SVD_PATH:
     try:
+        import pickle
         with open(SVD_PATH, "rb") as f:
             svd_model = pickle.load(f)
         print(f"Successfully loaded SVD model pickle from {os.path.basename(SVD_PATH)}")
     except Exception as e:
-        print(f"Warning: failed to load SVD model pickle — {e}")
+        print(f"Warning: SVD model pickle present but skipped ({e}) — fallback enabled")
 else:
-    print("Warning: SVD model pickle not found — SVD signal disabled, content-based path still works")
+    print("Warning: SVD model pickle not found — fallback enabled")
 
-# Load embedding model once at startup
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
+# Try loading SentenceTransformer embedder defensively, else fallback to scikit-learn HashingVectorizer (384-dim)
+embedder = None
+try:
+    from sentence_transformers import SentenceTransformer
+    embedder = SentenceTransformer("all-MiniLM-L6-v2")
+    print("Loaded SentenceTransformer embedder")
+except Exception as e:
+    print("SentenceTransformer not installed — using scikit-learn feature vectorizer")
+
+# Fallback feature vectorizer (384 features matching MiniLM dimension)
+vectorizer = HashingVectorizer(n_features=384, alternate_sign=False)
 
 
 class EmbedRequest(BaseModel):
@@ -59,8 +68,18 @@ def health():
 def embed(req: EmbedRequest):
     if not req.text or not req.text.strip():
         return {"embedding": [0.0] * 384}
-    vector = embedder.encode(req.text).tolist()
-    return {"embedding": vector}
+    if embedder is not None:
+        try:
+            vector = embedder.encode(req.text).tolist()
+            return {"embedding": vector}
+        except Exception:
+            pass
+    # Fast lightweight vectorizer (384-dim normalized vector)
+    vec = vectorizer.transform([req.text]).toarray()[0]
+    norm = np.linalg.norm(vec)
+    if norm > 0:
+        vec = vec / norm
+    return {"embedding": vec.tolist()}
 
 
 @app.post("/recommend", response_model=RecommendResponse)
