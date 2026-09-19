@@ -11,16 +11,21 @@ app = FastAPI()
 
 # Load SVD model defensively — service must not crash if this file is absent
 svd_model = None
-SVD_PATH = os.path.join(os.path.dirname(__file__), "svd_model.pkl")
-if os.path.exists(SVD_PATH):
+possible_paths = [
+    os.path.join(os.path.dirname(__file__), "svd_model.pkl"),
+    os.path.join(os.path.dirname(__file__), "svd_modelNew.pkl")
+]
+SVD_PATH = next((p for p in possible_paths if os.path.exists(p)), None)
+
+if SVD_PATH:
     try:
         with open(SVD_PATH, "rb") as f:
             svd_model = pickle.load(f)
-        print("Successfully loaded SVD model pickle")
+        print(f"Successfully loaded SVD model pickle from {os.path.basename(SVD_PATH)}")
     except Exception as e:
-        print(f"Warning: failed to load svd_model.pkl — {e}")
+        print(f"Warning: failed to load SVD model pickle — {e}")
 else:
-    print("Warning: svd_model.pkl not found — SVD signal disabled, content-based path still works")
+    print("Warning: SVD model pickle not found — SVD signal disabled, content-based path still works")
 
 # Load embedding model once at startup
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
