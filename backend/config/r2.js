@@ -18,22 +18,27 @@ const isR2Configured = () => {
 
 let s3Client = null;
 
-if (isR2Configured()) {
-  s3Client = new S3Client({
-    region: 'auto',
-    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID,
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
-    },
-  });
-}
+const getS3Client = () => {
+  if (s3Client) return s3Client;
+  if (isR2Configured()) {
+    s3Client = new S3Client({
+      region: 'auto',
+      endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: process.env.R2_ACCESS_KEY_ID,
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+      },
+    });
+  }
+  return s3Client;
+};
 
 /**
  * Generate a pre-signed PUT URL for client-side direct upload to Cloudflare R2
  */
 export const generateUploadUrl = async (objectKey, contentType = 'video/mp4') => {
-  if (!isR2Configured() || !s3Client) {
+  const client = getS3Client();
+  if (!client) {
     return {
       uploadUrl: `http://localhost:${process.env.PORT || 5000}/api/videos/mock-upload/${objectKey}`,
       objectKey,
@@ -47,7 +52,7 @@ export const generateUploadUrl = async (objectKey, contentType = 'video/mp4') =>
     ContentType: contentType,
   });
 
-  const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 900 }); // 15 minutes
+  const uploadUrl = await getSignedUrl(client, command, { expiresIn: 900 }); // 15 minutes
   return {
     uploadUrl,
     objectKey,
@@ -59,27 +64,23 @@ export const generateUploadUrl = async (objectKey, contentType = 'video/mp4') =>
  * Generate a pre-signed GET URL for direct byte-range video streaming from Cloudflare R2
  */
 export const generateStreamUrl = async (objectKey, expiresIn = 3600) => {
-  if (!objectKey) return 'https://media.w3.org/2010/05/sintel/trailer.mp4';
+  if (!objectKey) return null;
 
-  // 1. If objectKey is a working HTTP/HTTPS URL (e.g. public sample videos), return directly
+  // If objectKey is already a direct HTTP/HTTPS URL, return directly
   if (objectKey.startsWith('http://') || objectKey.startsWith('https://')) {
     return objectKey;
   }
 
-  // 2. If R2 is not configured, return fallback sample
-  if (!isR2Configured() || !s3Client) {
-    return 'https://media.w3.org/2010/05/sintel/trailer.mp4';
+  const client = getS3Client();
+  if (!client) {
+    console.error('[R2 Error] R2 storage is not configured on server. Missing R2 environment variables.');
+    throw new Error('Cloudflare R2 storage credentials not configured on server');
   }
 
-  try {
-    const command = new GetObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME,
-      Key: objectKey,
-    });
+  const command = new GetObjectCommand({
+    Bucket: process.env.R2_BUCKET_NAME,
+    Key: objectKey,
+  });
 
-    return await getSignedUrl(s3Client, command, { expiresIn }); // 1 hour expiration
-  } catch (error) {
-    console.error(`[R2 Stream Sign Error] Failed to generate signed GET URL for key ${objectKey}:`, error.message);
-    return 'https://media.w3.org/2010/05/sintel/trailer.mp4';
-  }
+  return await getSignedUrl(client, command, { expiresIn }); // 1 hour expiration
 };
