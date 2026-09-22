@@ -65,7 +65,7 @@ app.use(express.json());
 app.use('/api', generalApiLimiter);
 app.use('/api/auth', authRateLimiter);
 
-// Auto-sync 80 titles across Horror, Sci-Fi, Comedy, and Thriller genres to MongoDB Atlas
+// Auto-sync 20 clean titles with audio across Horror, Sci-Fi, Comedy, and Thriller genres to MongoDB Atlas
 const autoSeedCatalogIfEmpty = async () => {
   try {
     const adminPasswordHash = await bcrypt.hash('admin123', 10);
@@ -83,29 +83,27 @@ const autoSeedCatalogIfEmpty = async () => {
       { upsert: true, new: true }
     );
 
-    const videoCount = await Video.countDocuments();
-    if (videoCount < 80) {
-      console.log(`[Catalog Sync] Current count: ${videoCount}/80. Syncing 80 titles across Horror, Sci-Fi, Comedy, Thriller...`);
-      for (const item of catalog80Titles) {
-        await Video.findOneAndUpdate(
-          { title: item.title },
-          {
-            title: item.title,
-            description: item.description,
-            genre: item.genre,
-            thumbnailUrl: item.thumbnailUrl,
-            videoKey: item.r2Key,
-            durationSeconds: 180,
-            uploadedBy: admin._id,
-          },
-          { upsert: true, new: true }
-        );
-      }
-      const updatedCount = await Video.countDocuments();
-      console.log(`[Catalog Sync Success] Successfully synced ${updatedCount} titles to database.`);
-    } else {
-      console.log(`[Catalog Check] Loaded ${videoCount} existing titles from database.`);
+    // Sync 20 clean titles with audio into MongoDB Atlas & prune older test records
+    const validTitles = catalog80Titles.map(t => t.title);
+    await Video.deleteMany({ title: { $nin: validTitles } });
+
+    for (const item of catalog80Titles) {
+      await Video.findOneAndUpdate(
+        { title: item.title },
+        {
+          title: item.title,
+          description: item.description,
+          genre: item.genre,
+          thumbnailUrl: item.thumbnailUrl,
+          videoKey: item.r2Key,
+          durationSeconds: item.durationSeconds || 180,
+          uploadedBy: admin._id,
+        },
+        { upsert: true, new: true }
+      );
     }
+    const updatedCount = await Video.countDocuments();
+    console.log(`[Catalog Sync Success] Successfully synced ${updatedCount} clean video titles with audio to MongoDB Atlas.`);
   } catch (err) {
     console.error('[Boot Sync Error]', err.message);
   }
