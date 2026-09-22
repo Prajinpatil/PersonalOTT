@@ -22,7 +22,7 @@ export const HomePage = () => {
       setLoading(true);
       setError(null);
       try {
-        const videosRes = await api.get('/videos?limit=50');
+        const videosRes = await api.get('/videos?limit=100');
         setVideos(videosRes.data.videos || []);
 
         if (user) {

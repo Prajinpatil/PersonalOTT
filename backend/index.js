@@ -12,10 +12,12 @@ import authRoutes from './routes/auth.routes.js';
 import videoRoutes from './routes/video.routes.js';
 import progressRoutes from './routes/progress.routes.js';
 import recommendationsRouter from './routes/recommendations.routes.js';
+import { catalog80Titles } from './config/catalog80.js';
 
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 5000;
 
 // Rate Limiters to protect single-instance cloud CPU/RAM against DoS & brute-force
@@ -63,13 +65,13 @@ app.use(express.json());
 app.use('/api', generalApiLimiter);
 app.use('/api/auth', authRateLimiter);
 
-// Create default admin/demo accounts on boot if needed (without inserting sample videos)
+// Auto-sync 80 titles across Horror, Sci-Fi, Comedy, and Thriller genres to MongoDB Atlas
 const autoSeedCatalogIfEmpty = async () => {
   try {
     const adminPasswordHash = await bcrypt.hash('admin123', 10);
     const userPasswordHash = await bcrypt.hash('user123', 10);
 
-    await User.findOneAndUpdate(
+    const admin = await User.findOneAndUpdate(
       { email: 'admin@ott.com' },
       { name: 'OTT Admin', email: 'admin@ott.com', passwordHash: adminPasswordHash, role: 'admin' },
       { upsert: true, new: true }
@@ -82,9 +84,30 @@ const autoSeedCatalogIfEmpty = async () => {
     );
 
     const videoCount = await Video.countDocuments();
-    console.log(`[Catalog Check] Loaded ${videoCount} existing titles from database.`);
+    if (videoCount < 80) {
+      console.log(`[Catalog Sync] Current count: ${videoCount}/80. Syncing 80 titles across Horror, Sci-Fi, Comedy, Thriller...`);
+      for (const item of catalog80Titles) {
+        await Video.findOneAndUpdate(
+          { title: item.title },
+          {
+            title: item.title,
+            description: item.description,
+            genre: item.genre,
+            thumbnailUrl: item.thumbnailUrl,
+            videoKey: item.r2Key,
+            durationSeconds: 180,
+            uploadedBy: admin._id,
+          },
+          { upsert: true, new: true }
+        );
+      }
+      const updatedCount = await Video.countDocuments();
+      console.log(`[Catalog Sync Success] Successfully synced ${updatedCount} titles to database.`);
+    } else {
+      console.log(`[Catalog Check] Loaded ${videoCount} existing titles from database.`);
+    }
   } catch (err) {
-    console.error('[Boot Check Error]', err.message);
+    console.error('[Boot Sync Error]', err.message);
   }
 };
 
