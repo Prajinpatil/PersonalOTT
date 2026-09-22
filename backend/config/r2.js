@@ -59,20 +59,14 @@ export const generateUploadUrl = async (objectKey, contentType = 'video/mp4') =>
  * Generate a pre-signed GET URL for direct byte-range video streaming from Cloudflare R2
  */
 export const generateStreamUrl = async (objectKey, expiresIn = 3600) => {
-  if (!objectKey) return null;
+  if (!objectKey) return 'https://media.w3.org/2010/05/sintel/trailer.mp4';
 
-  // Clean object key if legacy Google Cloud URL was stored
-  let cleanKey = objectKey;
-  if (cleanKey.includes('commondatastorage.googleapis.com')) {
-    const filename = cleanKey.split('/').pop();
-    cleanKey = `videos/general/${filename}`;
+  // 1. If objectKey is a working HTTP/HTTPS URL (e.g. public sample videos), return directly
+  if (objectKey.startsWith('http://') || objectKey.startsWith('https://')) {
+    return objectKey;
   }
 
-  // If objectKey is a working HTTP URL (like W3C open stream), return directly
-  if (cleanKey.startsWith('http://') || cleanKey.startsWith('https://')) {
-    return cleanKey;
-  }
-
+  // 2. If R2 is not configured, return fallback sample
   if (!isR2Configured() || !s3Client) {
     return 'https://media.w3.org/2010/05/sintel/trailer.mp4';
   }
@@ -80,12 +74,12 @@ export const generateStreamUrl = async (objectKey, expiresIn = 3600) => {
   try {
     const command = new GetObjectCommand({
       Bucket: process.env.R2_BUCKET_NAME,
-      Key: cleanKey,
+      Key: objectKey,
     });
 
     return await getSignedUrl(s3Client, command, { expiresIn }); // 1 hour expiration
   } catch (error) {
-    console.error(`[R2 Stream Sign Error] Failed to generate signed GET URL for key ${cleanKey}:`, error.message);
+    console.error(`[R2 Stream Sign Error] Failed to generate signed GET URL for key ${objectKey}:`, error.message);
     return 'https://media.w3.org/2010/05/sintel/trailer.mp4';
   }
 };
