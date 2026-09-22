@@ -63,9 +63,26 @@ app.use(express.json());
 app.use('/api', generalApiLimiter);
 app.use('/api/auth', authRateLimiter);
 
-// Auto-seed catalog if empty on server boot
+// Auto-seed catalog if empty on server boot & auto-migrate legacy HTTP keys to R2
 const autoSeedCatalogIfEmpty = async () => {
   try {
+    // Migrate legacy HTTP videoKeys in existing database records to Cloudflare R2 object keys
+    try {
+      const legacyVideos = await Video.find({ videoKey: { $regex: '^https?://' } });
+      if (legacyVideos.length > 0) {
+        console.log(`[R2 Migration] Updating ${legacyVideos.length} titles in MongoDB Atlas to Cloudflare R2 object keys...`);
+        for (const v of legacyVideos) {
+          const genreFolder = (v.genre && v.genre[0]) ? v.genre[0].toLowerCase() : 'general';
+          const cleanTitle = v.title.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+          v.videoKey = `videos/${genreFolder}/${cleanTitle}.mp4`;
+          await v.save();
+        }
+        console.log('[R2 Migration] Successfully migrated all database titles to Cloudflare R2 paths!');
+      }
+    } catch (migErr) {
+      console.warn('[R2 Migration Warning]', migErr.message);
+    }
+
     const videoCount = await Video.countDocuments();
     if (videoCount > 0) {
       console.log(`[Catalog Check] Loaded ${videoCount} existing titles from database.`);
