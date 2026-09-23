@@ -83,29 +83,27 @@ const autoSeedCatalogIfEmpty = async () => {
       { upsert: true, new: true }
     );
 
-    // Ensure admin & user credentials exist
-    const count = await Video.countDocuments();
-    if (count === 0 && process.env.ENABLE_AUTO_SEED === 'true') {
-      console.log('[Catalog Sync] Database empty. Seeding initial catalog...');
-      for (const item of catalog80Titles) {
-        await Video.findOneAndUpdate(
-          { title: item.title },
-          {
-            title: item.title,
-            description: item.description,
-            genre: item.genre,
-            thumbnailUrl: item.thumbnailUrl,
-            videoKey: item.r2Key,
-            durationSeconds: item.durationSeconds || 180,
-            uploadedBy: admin._id,
-          },
-          { upsert: true, new: true }
-        );
-      }
-      console.log(`[Catalog Sync Success] Synced ${catalog80Titles.length} clean titles.`);
-    } else {
-      console.log(`[Catalog Check] Current catalog count: ${count} videos.`);
+    // Sync 34 custom video titles into MongoDB Atlas & prune older test records
+    const validTitles = catalog80Titles.map((t) => t.title);
+    await Video.deleteMany({ title: { $nin: validTitles } });
+
+    for (const item of catalog80Titles) {
+      await Video.findOneAndUpdate(
+        { title: item.title },
+        {
+          title: item.title,
+          description: item.description,
+          genre: item.genre,
+          thumbnailUrl: item.thumbnailUrl,
+          videoKey: item.r2Key,
+          durationSeconds: item.durationSeconds || 180,
+          uploadedBy: admin._id,
+        },
+        { upsert: true, new: true }
+      );
     }
+    const updatedCount = await Video.countDocuments();
+    console.log(`[Catalog Sync Success] Successfully synced ${updatedCount} user video titles to MongoDB Atlas.`);
   } catch (err) {
     console.error('[Boot Sync Error]', err.message);
   }
