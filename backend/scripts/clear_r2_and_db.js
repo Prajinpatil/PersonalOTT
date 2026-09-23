@@ -3,7 +3,7 @@ import { S3Client, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/c
 import { connectDB } from '../config/db.js';
 import { Video } from '../models/Video.js';
 
-dotenv.config();
+dotenv.config({ path: 'backend/.env' });
 
 const s3Client = new S3Client({
   region: 'auto',
