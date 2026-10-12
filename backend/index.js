@@ -104,6 +104,7 @@ const autoSeedCatalogIfEmpty = async () => {
     }
     const updatedCount = await Video.countDocuments();
     console.log(`[Catalog Sync Success] Successfully synced ${updatedCount} user video titles to MongoDB Atlas.`);
+    
   } catch (err) {
     console.error('[Boot Sync Error]', err.message);
   }

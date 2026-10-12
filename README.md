@@ -1,4 +1,4 @@
-# PersonalOTT — Full-Stack Video Streaming Platform
+# PersonalOTT — Full-Stack Video Streaming Platform.
 
 PersonalOTT is a production-engineered, full-stack video streaming platform built with **React (Vite)**, **Node.js / Express**, **MongoDB Atlas**, and **Cloudflare R2** object storage.
 
